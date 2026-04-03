@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Planner Master V18.1 (Rating Slider Added)</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ★ 강원교육모두체 폰트 ★ */
+        @font-face { font-family: 'GangwonEducationModuche'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFLightA.woff') format('woff'); font-weight: 300; font-display: swap; } 
+        @font-face { font-family: 'GangwonEducationModuche'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFBoldA.woff') format('woff'); font-weight: 700; font-display: swap; }
+
+        :root {
+            --bg: #F8F9FB; --white: #FFF; --primary: #4A90E2; 
+            --primary-light: #E3F2FD; --text: #2D3436; --gray: #B0B8C1;
+            --focus-bg: #FFF9C4; --danger: #FF5E5E;
+        }
+        
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'GangwonEducationModuche', sans-serif; background: var(--bg); overflow: hidden; user-select: none; }
+        .app { display: flex; flex-direction: column; height: 100vh; }
+        
+        /* 헤더 (달력 영역) */
+        .header { background: var(--white); padding: 15px 20px; border-bottom: 1px solid #EEE; z-index: 100; flex-shrink: 0; }
+        .cal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; position: relative; transition: background 0.3s; }
+        .day.empty { cursor: default; pointer-events: none; background: transparent !important; } 
+        .day.past-date { color: #CCC; } 
+        .day.sunday-date { color: var(--danger); } 
+        .day.saturday-date { color: var(--primary); } 
+        .day.selected:not(.today) { box-shadow: inset 0 0 0 2px var(--primary); font-weight: 800; } 
+        .day.today { background: var(--primary) !important; color: white !important; } 
+        
+        .has-task::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; background: orange; border-radius: 50%; }
+
+        /* 바디 (사이드바 + 메인) */
+        .body-container { flex: 1; display: flex; overflow: hidden; position: relative; }
+        
+        /* 사이드바 */
+        .sidebar { width: 85px; background: var(--bg); border-right: 1px solid #EEE; display: flex; flex-direction: column; align-items: center; padding-top: 15px; z-index: 10; }
+        
+        .avatar { width: 50px; height: 50px; background-color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; cursor: pointer; background-size: cover; background-position: center; border: 2px solid var(--primary-light); }
+        
+        .divider { width: 40px; height: 1px; background: #DDD; margin-bottom: 15px; }
+        
+        .nav-scroll { flex: 1; overflow-y: auto; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; padding-bottom: 20px; }
+        .nav-item { width: 55px; height: 55px; border-radius: 18px; background: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; cursor: pointer; border: 2px solid #EEE; transition: 0.2s; position: relative; flex-shrink: 0; }
+        .nav-item.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+        .nav-item.add-btn-sub { border: 2px dashed #CCC; color: #AAA; }
+
+        /* 메인 콘텐츠 */
+        .main-content { flex: 1; display: flex; flex-direction: column; background: var(--white); overflow: hidden; }
+        .scroll-area { flex: 1; padding: 25px; overflow-y: auto; }
+
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .section-title { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+        .add-mini-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: #F0F0F0; font-size: 18px; cursor: pointer; color: #555; display: flex; align-items: center; justify-content: center; }
+
+        /* 단일 메모 박스 스타일 (연노란색) */
+        .goal-memo-wrapper { display: flex; border: 2px dashed #CCC; border-radius: 12px; overflow: hidden; flex: 1; min-width: 180px; max-width: 100%; margin-left: auto; background: #FFF9C4; }
+        .memo-box { padding: 12px 15px; font-size: 0.95rem; color: #333; flex: 1; cursor: pointer; display: flex; align-items: center; min-height: 20px; word-break: break-all; transition: background 0.2s; justify-content: center; font-weight: 600;}
+        .memo-box:active { background: #FFF176; }
+
+        /* 할 일 카드 & 드래그 효과 */
+        .task-list-container { min-height: 20px; padding-bottom: 10px; }
+        .task-card { background: #F7F9FC; padding: 16px; border-radius: 16px; margin-bottom: 8px; display: flex; align-items: center; position: relative; overflow: hidden; touch-action: none; transition: transform 0.2s, box-shadow 0.2s; }
+        .task-card.focus { background: var(--focus-bg); border: 1px solid #FBC02D; }
+        .task-card.dragging { z-index: 1000; opacity: 0.9; box-shadow: 0 10px 20px rgba(0,0,0,0.2); transform: scale(1.05); background: white; border: 2px solid var(--primary); }
+        .sortable-placeholder { height: 54px; background: #EEE; border-radius: 16px; margin-bottom: 8px; border: 2px dashed #CCC; opacity: 0.5; }
+
+        /* 완료된 할 일 스타일 */
+        .task-card.done { opacity: 0.6; background: #F0F0F0; border: none; }
+        .task-card.done .task-text { text-decoration: line-through; color: #999; }
+
+        .swipe-bg { position: absolute; left: 0; top: 0; height: 100%; width: 0; display: flex; align-items: center; padding-left: 15px; font-weight: bold; font-size: 12px; color: #555; transition: 0.1s; }
+        .task-inner { display: flex; align-items: center; width: 100%; flex: 1; z-index: 2; background: inherit; }
+        .task-text { flex: 1; margin-left: 12px; font-size: 15px; font-weight: 500; }
+
+        .subject-group-label { font-size: 0.85rem; font-weight: 800; color: var(--primary); margin: 15px 0 8px 5px; }
+
+        /* 메모 뷰 스타일 */
+        .memo-view { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #E9ECEF; z-index: 200; flex-direction: column; }
+        .memo-header { padding: 20px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .memo-board { flex: 1; padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; align-content: start; }
+        
+        .post-it { 
+            background: #FEFF9C; padding: 15px; border-radius: 2px 15px 15px 15px; min-height: 120px; 
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.1); position: relative; font-family: 'GangwonEducationModuche', sans-serif;
+            font-size: 0.95rem; line-height: 1.4; color: #333; cursor: pointer;
+        }
+        .post-it::before { content: ''; position: absolute; top: 0; left: 0; width: 30px; height: 30px; background: rgba(0,0,0,0.05); border-radius: 0 0 15px 0; }
+        .post-it:nth-child(even) { background: #FFC0CB; transform: rotate(2deg); }
+        .post-it:nth-child(3n) { background: #7AFDE4; transform: rotate(-2deg); }
+
+        /* 연간(월 선택) 뷰 스타일 */
+        .year-view { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #F8F9FB; z-index: 300; flex-direction: column; }
+        .year-nav-btn { font-size: 1.2rem; cursor: pointer; color: var(--primary); padding: 5px 15px; font-weight: bold; }
+        .month-grid { flex: 1; padding: 30px 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; align-content: center; }
+        .month-cell { 
+            background: white; border-radius: 16px; padding: 25px 0; text-align: center; 
+            font-size: 1.2rem; font-weight: 700; color: #333; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent;
+        }
+        .month-cell:active { transform: scale(0.95); }
+        .month-cell.current-month { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(74,144,226,0.3); }
+
+        /* ★ 새로 추가된 평가 슬라이더 모달창 스타일 ★ */
+        .rating-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center; flex-direction: column; }
+        .rating-modal-box { background: white; width: 85%; max-width: 320px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: 'GangwonEducationModuche', sans-serif; }
+        
+        .rating-slider { -webkit-appearance: none; width: 100%; height: 10px; border-radius: 5px; background: #ddd; outline: none; margin: 20px 0; }
+        .rating-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        
+        .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; font-family: 'GangwonEducationModuche', sans-serif; }
+        .btn-clear { background: #F0F0F0; color: #888; }
+        .btn-cancel { background: #CCC; color: #FFF; }
+        .btn-save { background: var(--primary); color: #FFF; }
+    </style>
+</head>
+<body>
+
+<input type="file" id="imgUpload" accept="image/*" style="display:none;">
+
+<div class="app">
+    <div class="header" id="calHeader">
+        <div class="cal-top">
+            <div id="calTitle" style="font-weight: 800; font-size: 1.2rem; cursor: pointer;"></div>
+            <div id="swipeHint" style="font-size: 0.7rem; color: #AAA;">↕ 주간/월간 ↔ 이전/다음 달</div>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="body-container">
+        <div class="sidebar">
+            <div class="avatar" id="profileIcon">😊</div>
+            <div class="divider"></div>
+            <div class="nav-scroll" id="sideNav"></div>
+            <div style="margin-top:auto; font-size:0.7rem; color:#CCC; text-align:center; padding-bottom:10px;">꾹 눌러 이동/편집</div>
+        </div>
+
+        <div class="main-content">
+            <div class="scroll-area">
+                
+                <div style="margin-bottom: 30px;">
+                    <div class="section-header" style="flex-wrap: wrap; gap: 10px;">
+                        <div class="section-title" id="dateSectionTitle" style="display: flex; align-items: center;">⭐ 오늘 할 일</div>
+                        
+                        <div class="goal-memo-wrapper">
+                            <div class="memo-box" id="memoBox" onclick="editDailyMemo()"></div>
+                        </div>
+                    </div>
+                    <div id="scheduledList" class="task-list-container"></div>
+                </div>
+
+                <div style="border-top: 2px solid #F0F0F0; padding-top: 20px;">
+                    <div class="section-header">
+                        <div class="section-title" id="backlogTitle">📂 과목 보관함</div>
+                        <button class="add-mini-btn" onclick="addTaskToBacklog()">+</button>
+                    </div>
+                    <div style="font-size:0.75rem; color:#999; margin-bottom:15px;">👉 스와이프: 날짜 배정 / 꾹 누르기: 삭제</div>
+                    <div id="backlogList" class="task-list-container"></div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="memo-view" id="memoView">
+            <div class="memo-header">
+                <span style="font-size: 24px; cursor: pointer;" onclick="toggleMemoView()">⬅️</span>
+                <span style="font-size: 1.2rem; font-weight: 800;">📌 포스트잇 보드</span>
+                <button onclick="addMemo()" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:20px; font-weight:bold;">+ 새 메모</button>
+            </div>
+            <div class="memo-board" id="memoBoard"></div>
+        </div>
+
+        <div class="year-view" id="yearView">
+            <div class="memo-header">
+                <span style="font-size: 24px; cursor: pointer;" onclick="toggleYearView()">⬅️</span>
+                <div style="display: flex; align-items: center;">
+                    <span class="year-nav-btn" onclick="changeYear(-1)">◀</span>
+                    <span id="yearSelectTitle" style="font-size: 1.3rem; font-weight: 800; margin: 0 10px;">2026년</span>
+                    <span class="year-nav-btn" onclick="changeYear(1)">▶</span>
+                </div>
+                <div style="width: 24px;"></div> 
+            </div>
+            <div class="month-grid" id="monthGrid"></div>
+        </div>
+
+        <div class="rating-modal-overlay" id="ratingModal">
+            <div class="rating-modal-box">
+                <h2 id="ratingModalTitle" style="margin-top:0; color:#333; font-size: 1.4rem;">하루 평가</h2>
+                <div style="font-size: 2.5rem; margin: 10px 0; color: #FFD700;">⭐</div>
+                <div style="font-size: 1.8rem; font-weight: bold; color: var(--primary); margin-bottom: 5px;" id="ratingScoreDisplay">5점</div>
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 20px;">좌우로 드래그해서 점수를 매겨주세요</div>
+                
+                <input type="range" id="ratingSlider" class="rating-slider" min="1" max="10" value="5">
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button class="modal-btn btn-clear" id="btnRatingClear">초기화</button>
+                    <button class="modal-btn btn-cancel" id="btnRatingCancel">취소</button>
+                    <button class="modal-btn btn-save" id="btnRatingSave">저장</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- 날짜 시스템 ---
+    const tObj = new Date();
+    const todayStr = `${tObj.getFullYear()}-${tObj.getMonth()+1}-${tObj.getDate()}`;
+    const daysKr = ['일', '월', '화', '수', '목', '금', '토']; 
+    
+    // --- 데이터 관리 ---
+    let state = JSON.parse(localStorage.getItem('plannerV18')) || {
+        subjects: [{id:1, name:'국어', tasks:[]}, {id:2, name:'수학', tasks:[]}],
+        selectedDate: todayStr
+    };
+    
+    if (!state.memos) state.memos = [{text: '환영합니다! 탭해서 수정하거나 삭제하세요.'}];
+    if (typeof state.profileImg === 'undefined') state.profileImg = null;
+    if (!state.dailyMemos) state.dailyMemos = {}; 
+    if (!state.ratings) state.ratings = {}; 
+
+    function save() { localStorage.setItem('plannerV18', JSON.stringify(state)); }
+
+    // 전역 상태
+    let isMonthly = false;
+    let curSubIdx = 0;
+    
+    let [selY, selM, selD] = state.selectedDate.split('-').map(Number);
+    let viewYear = selY;
+    let viewMonth = selM - 1; 
+    let selectYear = viewYear; 
+
+    // ★ 평가 모달 관련 변수 ★
+    let targetRatingDateStr = '';
+
+    function getWeekOfMonth(year, month, day) {
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        return Math.ceil((day + firstDayOfMonth) / 7);
+    }
+
+    function render() { renderCal(); renderNav(); renderTasks(); }
+
+    function updateProfileImage() {
+        const pIcon = document.getElementById('profileIcon');
+        if(state.profileImg) {
+            pIcon.style.backgroundImage = `url(${state.profileImg})`;
+            pIcon.innerHTML = ''; 
+        } else {
+            pIcon.style.backgroundImage = 'none';
+            pIcon.innerHTML = '😊';
+        }
+    }
+
+    const profileIcon = document.getElementById('profileIcon');
+    let profileTimer;
+    let isProfileLong = false;
+
+    profileIcon.addEventListener('touchstart', (e) => {
+        isProfileLong = false;
+        profileTimer = setTimeout(() => {
+            isProfileLong = true;
+            if(navigator.vibrate) navigator.vibrate(40);
+            document.getElementById('imgUpload').click();
+        }, 500);
+    }, {passive: true});
+
+    profileIcon.addEventListener('touchmove', () => clearTimeout(profileTimer), {passive: true});
+
+    profileIcon.addEventListener('touchend', (e) => {
+        clearTimeout(profileTimer);
+        if (!isProfileLong) {
+            e.preventDefault();
+            toggleMemoView();
+        }
+    });
+
+    profileIcon.addEventListener('click', (e) => {
+        if(!isProfileLong) toggleMemoView();
+    });
+
+    document.getElementById('imgUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        if(file.size > 5 * 1024 * 1024) { alert('사진 용량이 5MB를 초과합니다.'); return; }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            state.profileImg = evt.target.result;
+            save(); updateProfileImage();
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function toggleMemoView() {
+        const memoView = document.getElementById('memoView');
+        memoView.style.display = memoView.style.display === 'flex' ? 'none' : 'flex';
+        if(memoView.style.display === 'flex') renderMemos();
+    }
+
+    function renderMemos() {
+        const board = document.getElementById('memoBoard'); board.innerHTML = '';
+        state.memos.forEach((memo, idx) => {
+            const pi = document.createElement('div');
+            pi.className = 'post-it'; pi.innerText = memo.text;
+            pi.onclick = () => {
+                const action = prompt("무엇을 할까요?\n1: 내용 수정\n2: 삭제");
+                if (action === '1') {
+                    const nt = prompt("메모 수정:", memo.text);
+                    if(nt) { state.memos[idx].text = nt; save(); renderMemos(); }
+                } else if (action === '2') {
+                    if(confirm('이 메모를 삭제할까요?')) { state.memos.splice(idx, 1); save(); renderMemos(); }
+                }
+            };
+            board.appendChild(pi);
+        });
+    }
+    function addMemo() { const t = prompt("새 메모 내용:"); if(t) { state.memos.push({text: t}); save(); renderMemos(); } }
+
+    function toggleYearView() {
+        const yView = document.getElementById('yearView');
+        if (yView.style.display === 'flex') {
+            yView.style.display = 'none';
+        } else {
+            selectYear = viewYear; 
+            yView.style.display = 'flex';
+            renderYearView();
+        }
+    }
+
+    function changeYear(delta) {
+        selectYear += delta;
+        renderYearView();
+    }
+
+    function renderYearView() {
+        document.getElementById('yearSelectTitle').innerText = `${selectYear}년`;
+        const grid = document.getElementById('monthGrid');
+        grid.innerHTML = '';
+        
+        for (let i = 0; i < 12; i++) {
+            const mCell = document.createElement('div');
+            mCell.className = 'month-cell';
+            
+            if (selectYear === viewYear && i === viewMonth) {
+                mCell.classList.add('current-month');
+            }
+            
+            mCell.innerText = `${i + 1}월`;
+            mCell.onclick = () => {
+                viewYear = selectYear;
+                viewMonth = i;
+                
+                let newDay = 1;
+                if (tObj.getFullYear() === viewYear && tObj.getMonth() === viewMonth) {
+                    newDay = tObj.getDate();
+                }
+                
+                state.selectedDate = `${viewYear}-${viewMonth + 1}-${newDay}`;
+                [selY, selM, selD] = [viewYear, viewMonth + 1, newDay];
+                
+                isMonthly = true; 
+                save();
+                toggleYearView();
+                render();
+            };
+            grid.appendChild(mCell);
+        }
+    }
+
+    function getRatingColor(score) {
+        if (!score) return '';
+        const lightness = 240 - (score * 8); 
+        return `rgb(${lightness}, ${lightness}, ${lightness})`;
+    }
+
+    // ★ 평가 모달창 함수 ★
+    function openRatingModal(dateStr, month, day) {
+        targetRatingDateStr = dateStr;
+        const currentScore = state.ratings[dateStr] || 5;
+        document.getElementById('ratingModalTitle').innerText = `${month}월 ${day}일 평가`;
+        
+        const slider = document.getElementById('ratingSlider');
+        slider.value = currentScore;
+        updateRatingUI(currentScore);
+        
+        document.getElementById('ratingModal').style.display = 'flex';
+    }
+
+    function updateRatingUI(val) {
+        document.getElementById('ratingScoreDisplay').innerText = `${val}점`;
+        const percent = (val - 1) / 9 * 100;
+        // 슬라이더 진행도에 따라 왼쪽은 파란색, 오른쪽은 회색으로 채우기
+        document.getElementById('ratingSlider').style.background = `linear-gradient(to right, var(--primary) ${percent}%, #ddd ${percent}%)`;
+    }
+
+    // 슬라이더 움직일 때마다 숫자 업데이트
+    document.getElementById('ratingSlider').addEventListener('input', function() {
+        updateRatingUI(this.value);
+    });
+
+    // 모달창 버튼 이벤트
+    document.getElementById('btnRatingSave').onclick = () => {
+        state.ratings[targetRatingDateStr] = parseInt(document.getElementById('ratingSlider').value);
+        save(); render();
+        document.getElementById('ratingModal').style.display = 'none';
+    };
+    
+    document.getElementById('btnRatingCancel').onclick = () => {
+        document.getElementById('ratingModal').style.display = 'none';
+    };
+    
+    document.getElementById('btnRatingClear').onclick = () => {
+        delete state.ratings[targetRatingDateStr];
+        save(); render();
+        document.getElementById('ratingModal').style.display = 'none';
+    };
+
+
+    function renderCal() {
+        const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+        
+        const yearHtml = `<span style="color: #222;">${viewYear}년</span>`;
+        const monthHtml = `<span style="color: var(--primary);">${viewMonth + 1}월</span>`;
+        
+        const calTitleEl = document.getElementById('calTitle');
+        if (isMonthly) {
+            calTitleEl.innerHTML = `${yearHtml} ${monthHtml}`;
+        } else {
+            const weekNum = getWeekOfMonth(viewYear, viewMonth, selD);
+            const weekHtml = `<span style="color: #AAA; font-size: 0.9rem; font-weight: 600;">(${weekNum}번째 주)</span>`;
+            calTitleEl.innerHTML = `${yearHtml} ${monthHtml} ${weekHtml}`;
+        }
+        
+        calTitleEl.onclick = toggleYearView;
+
+        let daysToRender = [];
+        
+        if (isMonthly) {
+            let firstDay = new Date(viewYear, viewMonth, 1).getDay(); 
+            let lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+            
+            for(let i=0; i<firstDay; i++) daysToRender.push(null); 
+            for(let i=1; i<=lastDay; i++) daysToRender.push({y:viewYear, m:viewMonth, d:i});
+        } else {
+            let d = new Date(selY, selM - 1, selD);
+            let sunday = new Date(selY, selM - 1, selD - d.getDay());
+            for(let i=0; i<7; i++) {
+                let wd = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i);
+                daysToRender.push({y:wd.getFullYear(), m:wd.getMonth(), d:wd.getDate()});
+            }
+        }
+
+        daysToRender.forEach(dateObj => {
+            const dEl = document.createElement('div');
+            
+            if (!dateObj) {
+                dEl.className = 'day empty';
+                grid.appendChild(dEl);
+                return;
+            }
+
+            let dateStr = `${dateObj.y}-${dateObj.m + 1}-${dateObj.d}`;
+            let isToday = (dateStr === todayStr);
+            let isSelected = (dateStr === state.selectedDate);
+            
+            let dObj = new Date(dateObj.y, dateObj.m, dateObj.d);
+            let dayOfWeek = dObj.getDay(); 
+            let todayMidnight = new Date(tObj.getFullYear(), tObj.getMonth(), tObj.getDate());
+            let isPast = dObj < todayMidnight; 
+
+            let colorClass = '';
+            if (isPast) colorClass = 'past-date'; 
+            else if (dayOfWeek === 0) colorClass = 'sunday-date'; 
+            else if (dayOfWeek === 6) colorClass = 'saturday-date'; 
+            
+            dEl.className = `day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${colorClass}`;
+            dEl.innerHTML = `<span>${dateObj.d}</span>`;
+            
+            if(state.subjects.some(sub => sub.tasks.some(t => t.date === dateStr && !t.d))) {
+                dEl.classList.add('has-task');
+            }
+
+            // ★ 가독성을 위한 글씨 색상 자동 조절 패치 ★
+            if (!isToday && state.ratings[dateStr]) {
+                let score = state.ratings[dateStr];
+                dEl.style.backgroundColor = getRatingColor(score);
+                
+                if (score >= 6) {
+                    dEl.style.color = '#FFF'; // 배경이 진하면 하얀 글씨
+                } else {
+                    dEl.style.color = '#333'; // 배경이 연하면 진한 검은색 글씨 (회색을 덮어씀)
+                }
+            }
+
+            let dayTimer, isDayLong = false;
+            
+            // ★ 모달창으로 연결 ★
+            dEl.addEventListener('touchstart', (e) => {
+                isDayLong = false;
+                dayTimer = setTimeout(() => {
+                    isDayLong = true;
+                    if(navigator.vibrate) navigator.vibrate(40);
+                    openRatingModal(dateStr, dateObj.m + 1, dateObj.d);
+                }, 600); 
+            }, {passive: true});
+
+            dEl.addEventListener('touchmove', () => clearTimeout(dayTimer), {passive: true});
+            
+            dEl.addEventListener('touchend', (e) => {
+                clearTimeout(dayTimer);
+                if (!isDayLong) {
+                    state.selectedDate = dateStr; 
+                    [selY, selM, selD] = dateStr.split('-').map(Number);
+                    viewYear = selY; viewMonth = selM - 1;
+                    save(); render(); 
+                }
+            });
+
+            dEl.onclick = () => {
+                if(!isDayLong) {
+                    state.selectedDate = dateStr; 
+                    [selY, selM, selD] = dateStr.split('-').map(Number);
+                    viewYear = selY; viewMonth = selM - 1;
+                    save(); render(); 
+                }
+            };
+
+            grid.appendChild(dEl);
+        });
+    }
+
+    function renderNav() {
+        const nav = document.getElementById('sideNav'); nav.innerHTML = '';
+        
+        let navPlaceholder = document.createElement('div');
+        navPlaceholder.className = 'nav-item';
+        navPlaceholder.style.backgroundColor = '#EEE';
+        navPlaceholder.style.border = '2px dashed #CCC';
+
+        state.subjects.forEach((s, i) => {
+            const el = document.createElement('div');
+            el.className = `nav-item ${i===curSubIdx?'active':''}`;
+            el.innerText = s.name.substring(0,2);
+            
+            el.onclick = () => { curSubIdx = i; render(); };
+            
+            let navTimer, navIsDragging = false, navHasMoved = false;
+            let touchStartX = 0, touchStartY = 0;
+
+            el.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                navIsDragging = false;
+                navHasMoved = false;
+                
+                navTimer = setTimeout(() => {
+                    navIsDragging = true;
+                    if(navigator.vibrate) navigator.vibrate(40);
+                    
+                    el.style.zIndex = '100';
+                    el.style.transform = 'scale(1.1)';
+                    el.style.opacity = '0.8';
+                    
+                    navPlaceholder.style.height = el.offsetHeight + 'px';
+                    navPlaceholder.style.width = el.offsetWidth + 'px';
+                    navPlaceholder.style.margin = '0 0 10px 0';
+                    navPlaceholder.style.borderRadius = '18px';
+                    nav.insertBefore(navPlaceholder, el.nextSibling);
+                }, 500); 
+            }, {passive: false});
+
+            el.addEventListener('touchmove', (e) => {
+                let dx = e.touches[0].clientX - touchStartX;
+                let dy = e.touches[0].clientY - touchStartY;
+                
+                if (!navIsDragging) {
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) clearTimeout(navTimer);
+                    return;
+                }
+                
+                navHasMoved = true;
+                e.preventDefault(); 
+                
+                el.style.transform = `translateY(${dy}px) scale(1.1)`;
+                
+                el.style.visibility = 'hidden';
+                let elemBelow = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+                el.style.visibility = 'visible';
+                
+                if(!elemBelow) return;
+                let targetItem = elemBelow.closest('.nav-item:not(.add-btn-sub)');
+                if(targetItem && targetItem !== el && targetItem !== navPlaceholder && targetItem.parentElement === nav) {
+                    const rect = targetItem.getBoundingClientRect();
+                    if(e.touches[0].clientY < rect.top + rect.height/2) {
+                        nav.insertBefore(navPlaceholder, targetItem);
+                    } else {
+                        nav.insertBefore(navPlaceholder, targetItem.nextSibling);
+                    }
+                }
+            }, {passive: false});
+
+            el.addEventListener('touchend', (e) => {
+                clearTimeout(navTimer);
+                if (navIsDragging) {
+                    e.preventDefault(); 
+                    el.style.zIndex = '';
+                    el.style.transform = '';
+                    el.style.opacity = '';
+                    
+                    if (navHasMoved) {
+                        let siblings = Array.from(nav.children).filter(c => c.classList.contains('nav-item') && !c.classList.contains('add-btn-sub') && c !== el);
+                        let newIdx = siblings.indexOf(navPlaceholder);
+                        
+                        if (newIdx !== -1 && newIdx !== i) {
+                            const [movedItem] = state.subjects.splice(i, 1);
+                            state.subjects.splice(newIdx, 0, movedItem);
+                            
+                            if (curSubIdx === i) curSubIdx = newIdx;
+                            else if (curSubIdx > i && curSubIdx <= newIdx) curSubIdx--;
+                            else if (curSubIdx < i && curSubIdx >= newIdx) curSubIdx++;
+                            save();
+                        }
+                    } else {
+                        setTimeout(() => {
+                            let newName = prompt(`'${s.name}' 과목을 수정합니다.\n(삭제하려면 '삭제'라고 입력하세요)`, s.name);
+                            if(newName === '삭제') {
+                                if(confirm('진짜 삭제할까요?')) { state.subjects.splice(i, 1); curSubIdx = 0; save(); render(); }
+                            } else if (newName) {
+                                s.name = newName; save(); render();
+                            }
+                        }, 10);
+                    }
+                    if (navPlaceholder.parentNode) navPlaceholder.parentNode.removeChild(navPlaceholder);
+                    render();
+                }
+            });
+
+            nav.appendChild(el);
+        });
+        
+        const addBtn = document.createElement('div');
+        addBtn.className = 'nav-item add-btn-sub'; addBtn.innerText = '+';
+        addBtn.onclick = () => {
+            const n = prompt("새 과목 이름:");
+            if(n) { state.subjects.push({id:Date.now(), name:n, tasks:[]}); save(); render(); }
+        };
+        nav.appendChild(addBtn);
+    }
+
+    function renderTasks() {
+        const schBox = document.getElementById('scheduledList');
+        const bklBox = document.getElementById('backlogList');
+        schBox.innerHTML = ''; bklBox.innerHTML = '';
+
+        if(!state.subjects[curSubIdx]) return;
+
+        let [sY, sM, sD] = state.selectedDate.split('-');
+        const selDateObj = new Date(sY, sM - 1, sD);
+        const dayStr = daysKr[selDateObj.getDay()];
+
+        if(state.selectedDate === todayStr) {
+            document.getElementById('dateSectionTitle').innerText = "⭐ 오늘 할 일";
+            document.getElementById('dateSectionTitle').style.color = "#E67700";
+        } else {
+            document.getElementById('dateSectionTitle').innerHTML = `${sM}월 ${sD}일 (<span style="color: var(--primary);">${dayStr}</span>)`;
+            document.getElementById('dateSectionTitle').style.color = "var(--text)";
+        }
+        document.getElementById('backlogTitle').innerText = `📂 ${state.subjects[curSubIdx].name}`;
+
+        if (!state.dailyMemos[state.selectedDate]) {
+            state.dailyMemos[state.selectedDate] = '';
+        }
+        document.getElementById('memoBox').innerText = state.dailyMemos[state.selectedDate] || '여기를 탭해 메모 작성';
+
+        let hasScheduled = false;
+        state.subjects.forEach((sub, sIdx) => {
+            const dailyTasks = sub.tasks.filter(t => t.date === state.selectedDate && !t.d);
+            if(dailyTasks.length > 0) {
+                hasScheduled = true;
+                const groupLabel = document.createElement('div');
+                groupLabel.className = 'subject-group-label';
+                groupLabel.innerText = `📘 ${sub.name}`;
+                schBox.appendChild(groupLabel);
+
+                dailyTasks.forEach(t => {
+                    const originalIdx = sub.tasks.indexOf(t);
+                    schBox.appendChild(createTaskEl(t, originalIdx, sIdx, true));
+                });
+            }
+        });
+        if(!hasScheduled) schBox.innerHTML = '<div style="color:#AAA; font-size:0.9rem; padding:10px 0;">계획된 일정이 없습니다.</div>';
+
+        let hasDone = false;
+        const doneBox = document.createElement('div');
+        doneBox.style.marginTop = '25px';
+        doneBox.style.borderTop = '1px dashed #EEE';
+        doneBox.style.paddingTop = '15px';
+        
+        const doneTitle = document.createElement('div');
+        doneTitle.style.cssText = 'font-size: 0.95rem; font-weight: 800; color: #888; margin-bottom: 10px; display: flex; align-items: center;';
+        doneTitle.innerText = '✅ 완료';
+        doneBox.appendChild(doneTitle);
+
+        state.subjects.forEach((sub, sIdx) => {
+            const doneTasks = sub.tasks.filter(t => t.date === state.selectedDate && t.d);
+            if(doneTasks.length > 0) {
+                hasDone = true;
+                const groupLabel = document.createElement('div');
+                groupLabel.className = 'subject-group-label';
+                groupLabel.style.color = '#AAA'; 
+                groupLabel.innerText = `📘 ${sub.name}`;
+                doneBox.appendChild(groupLabel);
+
+                doneTasks.forEach(t => {
+                    const originalIdx = sub.tasks.indexOf(t);
+                    doneBox.appendChild(createTaskEl(t, originalIdx, sIdx, true));
+                });
+            }
+        });
+        
+        if(hasDone) schBox.appendChild(doneBox); 
+
+        const curSub = state.subjects[curSubIdx];
+        curSub.tasks.forEach((t, idx) => {
+            if(t.d) return; 
+            if(t.date !== state.selectedDate) {
+                bklBox.appendChild(createTaskEl(t, idx, curSubIdx, false));
+            }
+        });
+    }
+
+    let isSorting = false, dragEl = null, dragSrcList = null, placeholder = document.createElement('div');
+    placeholder.className = 'sortable-placeholder';
+
+    function createTaskEl(task, idx, sIdx, isScheduled) {
+        const card = document.createElement('div');
+        card.className = `task-card ${isScheduled && !task.d ? 'focus' : ''} ${task.d ? 'done' : ''}`;
+        
+        const bg = document.createElement('div'); bg.className = 'swipe-bg'; 
+        bg.innerText = isScheduled ? "보관함으로" : "날짜 배정";
+        bg.style.background = isScheduled ? "#EEE" : "#FFD700";
+
+        const inner = document.createElement('div'); inner.className = 'task-inner';
+        const chk = document.createElement('input');
+        chk.type = 'checkbox'; 
+        chk.checked = task.d; 
+        chk.style.marginRight = '12px'; chk.style.width = '20px'; chk.style.height = '20px';
+        
+        chk.onchange = (e) => { 
+            e.stopPropagation(); 
+            toggleDone(idx, sIdx); 
+        };
+
+        const txt = document.createElement('span'); txt.className = 'task-text'; txt.innerText = task.t;
+        txt.onclick = (e) => { e.stopPropagation(); if(!isSorting) editTask(idx, sIdx); };
+
+        inner.append(chk, txt); card.append(bg, inner);
+
+        let touchStartX = 0, touchStartY = 0;
+        let taskLongPressTimer;
+        
+        card.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
+            
+            taskLongPressTimer = setTimeout(() => {
+                if(navigator.vibrate) navigator.vibrate(40);
+                if(confirm('삭제하시겠습니까?')) {
+                    state.subjects[sIdx].tasks.splice(idx, 1);
+                    save();
+                    render();
+                }
+            }, 500);
+        }, {passive: false});
+
+        card.addEventListener('touchmove', (e) => {
+            let diffX = e.touches[0].clientX - touchStartX;
+            let diffY = e.touches[0].clientY - touchStartY;
+            
+            if(Math.abs(diffY) > 10 || Math.abs(diffX) > 10) clearTimeout(taskLongPressTimer);
+            
+            if(diffX > 0 && Math.abs(diffX) > Math.abs(diffY) && diffX < 150) {
+                inner.style.transform = `translateX(${diffX}px)`; bg.style.width = `${diffX}px`;
+                e.preventDefault();
+            }
+        }, {passive: false});
+
+        card.addEventListener('touchend', (e) => {
+            clearTimeout(taskLongPressTimer);
+            let diff = e.changedTouches[0].clientX - touchStartX;
+            if(diff > 80) toggleDate(idx, sIdx, isScheduled);
+            else { inner.style.transform = 'translateX(0)'; bg.style.width = '0'; }
+        });
+        return card;
+    }
+
+    function toggleDate(idx, sIdx, isAssigned) {
+        state.subjects[sIdx].tasks[idx].date = isAssigned ? null : state.selectedDate;
+        save(); render();
+    }
+
+    function toggleDone(idx, sIdx) {
+        let t = state.subjects[sIdx].tasks[idx];
+        t.d = !t.d; 
+        
+        if (t.d && t.date === null) {
+            t.date = state.selectedDate;
+        }
+        save(); render();
+    }
+
+    function editTask(idx, sIdx) {
+        const n = prompt("수정:", state.subjects[sIdx].tasks[idx].t);
+        if(n) { state.subjects[sIdx].tasks[idx].t = n; save(); render(); }
+    }
+    function addTaskToBacklog() {
+        const t = prompt("보관함에 추가할 할 일:");
+        if(t) { state.subjects[curSubIdx].tasks.push({t, d:false, date:null}); save(); render(); }
+    }
+
+    function editDailyMemo() {
+        let n = prompt("이 날짜에 남길 메모를 입력하세요:", state.dailyMemos[state.selectedDate] || '');
+        if (n !== null) { 
+            state.dailyMemos[state.selectedDate] = n; 
+            save(); renderTasks(); 
+        }
+    }
+
+    let headX = 0, headY = 0;
+    document.getElementById('calHeader').addEventListener('touchstart', e => {
+        headX = e.touches[0].clientX; headY = e.touches[0].clientY;
+    });
+    document.getElementById('calHeader').addEventListener('touchend', e => {
+        let dx = e.changedTouches[0].clientX - headX;
+        let dy = e.changedTouches[0].clientY - headY;
+        
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+            if (dx > 0) { 
+                viewMonth--; if(viewMonth < 0) { viewMonth = 11; viewYear--; }
+            } else { 
+                viewMonth++; if(viewMonth > 11) { viewMonth = 0; viewYear++; }
+            }
+            renderCal();
+        } 
+        else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 50) {
+            if (dy > 0) isMonthly = true; else isMonthly = false;
+            renderCal();
+        }
+    });
+
+    updateProfileImage();
+    render();
+</script>
+</body>
+</html>
