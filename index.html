@@ -120,6 +120,14 @@
         .btn-cancel { background: #CCC; color: #FFF; }
         .btn-save { background: var(--primary); color: #FFF; }
     </style>
+
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js');
+      }
+    </script>
+
 </head>
 <body>
 
